@@ -15,3 +15,7 @@
 ./nmap-xml-script-output-modify.py test.xml -s ,
 3. Output to test.csv
 ./nmap-xml-script-output-modify.py test.xml -s , -o test.csv
+
+For sanity, you may want to filter out "filtered" ports, which I'll probably add a script option for at some stage
+
+Also, since the parser conversion, this hasn't been widely tested on a bunch of environments, so probably contains bugs. 
