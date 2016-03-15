@@ -1,10 +1,12 @@
 ### Script for parsing nmap xml output to csv format
-	This script is originate by Didier Stevens and modified by Sumedt Jitpukdebodin
+	This script originally by Didier Stevens, modified by Sumedt Jitpukdebodin, changed to a SAX parser by liamosaur
 ### Version
 - 0.1
 		- Change some display and fix the bug of parser multiple ports and hosts
 - 0.2
 		- Rearrange columns and add end time column into output csv.
+- 0.3 liamosaur
+		- Rewritten to use a SAX XML parser instead of a DOM parser, so it doesn't explode and run out of memory if used on large XML files (from scanning Class B blocks etc)
 
 ### How to use
 1. Normal usage for display result
