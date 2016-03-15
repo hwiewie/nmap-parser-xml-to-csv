@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 
-
 __description__ = 'nmap xml script output parser'
-__author__ = 'Didier Stevens, modify by Sumedt Jitpukdebodin'
-__version__ = '0.2'
-__date__ = '2014/04/30'
+__author__ = 'Didier Stevens, modify by Sumedt Jitpukdebodin, modfied by liamosaur'
+__version__ = '0.3'
+__date__ = '2016/03/07'
 
 import optparse
 import xml.dom.minidom
+import xml.sax
 import glob
 import collections
 
@@ -62,46 +62,86 @@ class cOutputCSV():
     def Close(self):
         self.oOutput.Close()
 
+
+class NmapXmlHandler(xml.sax.ContentHandler):
+    def __init__(self):
+        self._rows = []
+        self._enddate = ''
+        self._vendors = ''
+        self._addresses = ''
+        self._hostnames = ''
+        self._script = ''
+        self._output = ''
+
+    def startElement(self, name, attrs):
+        if name == 'nmaprun':
+            self._startDate = attrs.get('startstr')
+        if name == 'finished': 
+            for row in self._rows: #This is the last element
+                row.append('|'.join([attrs.get('timestr')]))
+        if name == 'host':
+            if attrs.get('hostname') is not None:
+                self._hostnames += attrs.get('hostname')
+        if name == 'address':
+            if attrs.get('addr') is not None:
+                self._addresses += attrs.get('addr')
+        if name == 'vendor':
+            if attrs.get('vendor') is not None:
+                self._vendors += attrs.get('vendor')
+        if name == 'port':
+            self._port = attrs.get('portid')
+        if name == 'state':
+            if attrs.get('state') is not None:
+                self._state = attrs.get('state')
+        if name == 'service':
+            if attrs.get('name') is not None:
+                self._service = attrs.get('name')
+        if name == 'script':
+            if attrs.get('id') is not None:
+                self._script += attrs.get('id')
+            if attrs.get('output') is not None:
+                self._output += repr(attrs.get('output').encode('ascii').replace('\n  ',''))
+
+    def endElement(self,name):
+        if name == 'port': 
+            self._row = ['|'.join([self._startDate])]
+            self._row.append('|'.join([self._addresses]))
+            self._row.append('|'.join([self._vendors]))
+            self._row.append('|'.join([self._hostnames]))
+            self._row.append('|'.join([self._port]))
+            self._row.append('|'.join([self._state]))
+            self._row.append('|'.join([self._service]))
+            self._row.append('|'.join([self._script]))
+            self._row.append('|'.join([self._output]))
+            self._rows.append(self._row)
+        if name == 'host':
+            self._addresses = ''
+            self._hostnames = ''
+            self._vendors = ''
+            self._port = ''
+            self._state = ''
+            self._service = ''
+            self._script = ''
+            self._output = ''
+
+    def parse(self, f):
+        xml.sax.parse(f, self)
+        return self._rows
+
+    def characters(self, data):
+        pass
+
+
 def NmapXmlParser(filenames, options):
     oOuput = cOutputCSV(options)
-    oOuput.Row(['Start Time','End time','address', 'vendor','hostname', 'port', 'state', 'service', 'script', 'output'])
+    oOuput.Row(['Start Time','address', 'vendor','hostname', 'port', 'state', 'service', 'script', 'output','End time'])
     for filename in filenames:
-        domNmap = xml.dom.minidom.parse(open(filename, 'r'))
-
-#### Add date
-	nmap_header = domNmap.getElementsByTagName('nmaprun')
-	date = [nmap_header[0].getAttribute('startstr')]
-
-#### Add end date
-	nmap_footer = domNmap.getElementsByTagName('runstats')
-	enddate = [enddate.getAttribute('timestr') for enddate in nmap_footer[0].getElementsByTagName('finished')]
-
-        for hosttag in domNmap.getElementsByTagName('host'):
-            for port in hosttag.getElementsByTagName('port'):
-            	scriptFound = False
-            	row = ['|'.join(date)]
-            	addresses = [address.getAttribute('addr') for address in hosttag.getElementsByTagName('address') if address.getAttribute('addrtype') == 'ipv4']
-            	#row = ['|'.join(addresses)]
-            	row.append('|'.join(enddate))
-            	row.append('|'.join(addresses))
-            	vendors = [address.getAttribute('vendor') for address in hosttag.getElementsByTagName('address') if address.getAttribute('addrtype') == 'mac']
-            	row.append('|'.join(vendors))
-		### Remove all hostname(user,ptr) to be just user type only.
-            	# hostnames = [hostname.getAttribute('name') for hostname in hosttag.getElementsByTagName('hostname')]
-            	hostnames = [hostname.getAttribute('name') for hostname in hosttag.getElementsByTagName('hostname')  if hostname.getAttribute('type') == 'user']
-            	row.append('|'.join(hostnames))
-		row.append(port.getAttribute('portid'))
-		for state in port.getElementsByTagName('state'):
-			row.append(state.getAttribute('state'))
-		for service in port.getElementsByTagName('service'):
-			row.append(service.getAttribute('name'))
-		if port.getElementsByTagName('script'):
-			scriptFound = True
-			for script in port.getElementsByTagName('script'):
-				row.append(script.getAttribute('id'))
-				row.append(repr(script.getAttribute('output').encode('ascii').replace('\n  ','')))
-		oOuput.Row(row)
+        output = NmapXmlHandler().parse(open(filename, 'r'))
+        for row in output:
+            oOuput.Row(row)
     oOuput.Close()
+
+
 
 def File2Strings(filename):
     try:
